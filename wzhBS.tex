@@ -1,0 +1,555 @@
+\documentclass[Win]{xjtuBSThesis}  % 根据系统选择 Mac, Linux 或 Win
+
+%%%%%%%%%%%%%%%%%%%%% 用户信息配置 %%%%%%%%%%%%%%%%%%%%%
+\author{你的姓名}{Your Name} 
+\title{基于扩散模型的脑部MRI图像的脑肿瘤异常与定位检测算法}{Brain Tumor Anomaly Detection and Localization Algorithm in Brain MRI Based on Diffusion Models}
+\advisor{指导教师姓名}{Supervisor Name}
+
+% 重定义 section 前的换页行为：只换页，不强制跳到奇数页
+\renewcommand{\sectionbreak}{\clearpage}
+
+\begin{document}
+
+%--- 封面开始 ---
+\begin{titlepage}
+    \centering
+    \vspace{-2cm}
+    
+    % 1. 校徽
+    \includegraphics[width=0.6\textwidth]{xjtu2.png} \\ 
+    \vspace{2cm} 
+    
+    % 2. 论文类别 (二号 + 粗体/黑体)
+    {\erhao \bfseries 本科毕业设计（论文）} \\
+    \vspace{3cm} 
+    
+    % 3. 论文题目 (三号 + 粗体/黑体)
+    {\sanhao \bfseries 基于扩散模型的脑MRI肿瘤检测与定位研究} \\
+    \vspace{4.5cm} 
+    
+    % 4. 个人信息栏 (默认宋体，不需要\songti命令)
+    {\sanhao 
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{r l}
+        学\hspace{2em}院： & 生命科学与技术学院 \\
+        专\hspace{2em}业： & 生物医学工程 \\
+        班\hspace{2em}级： & 医电2203 \\
+        学生姓名： & 万子豪 \\
+        学\hspace{2em}号： & 2223612465 \\
+        指导教师： & 谢琳 \\
+    \end{tabular}
+    }
+    \vfill 
+    % 5. 日期
+    {\sanhao 2026 年 01 月}
+    \vspace{2cm} 
+\end{titlepage}
+
+%--- 去掉双页 ---
+% \let\cleardoublepage\clearpage
+%--- 封面结束 ---
+\frontmatter
+
+\begin{abstractcn} % 中文摘要
+
+脑部肿瘤作为一种高致死率的中枢神经系统疾病，其早期精准诊断对治疗方案的制定至关重要。磁共振成像（Magnetic Resonance Imaging, MRI）因其优异的软组织对比度而成为临床诊断的金标准。然而，现有的基于监督学习的自动检测方法高度依赖大规模像素级专家标注，且难以识别长尾分布的罕见病灶。针对上述问题，本文提出一种基于文本引导潜在扩散模型（Latent Diffusion Models, LDM）的脑部 MRI 无监督异常检测与定位算法，利用“以正推异”的重构范式，在仅使用健康数据训练的情况下实现对病灶的精准捕捉。本文的主要研究内容如下：
+
+首先，针对单纯文本引导在图像重构中容易丢失解剖结构细节的问题，设计了基于领域掩码网络的空间特征条件建模方法。该模块采用混合架构，利用卷积神经网络（Convolutional Neural Networks, CNN）提取 T2加权液体衰减反转恢复（T2-weighted Fluid Attenuated Inversion Recovery, T2-FLAIR）模态的局部纹理特征，并引入特征级领域掩码策略，随机遮蔽部分特征以防止模型产生恒等映射。在此基础上，应用 Transformer 捕获像素间的长距离依赖关系，生成具备全局解剖布局感知的空间特征向量，为扩散模型的生成过程提供强几何约束，确保重构图像严格遵循正常脑组织的拓扑结构。
+
+其次，为了增强模型对医学细粒度语义的理解，提出了基于视觉-语言模型（Vision-Language Models, VLM）的语义引导机制。通过构建包含解剖学先验的专家提示工程（Expert Prompt Engineering），利用预训练 VLM 生成描述正常脑部特征（如脑室、脑沟回）的文本嵌入向量。该向量通过交叉注意力机制注入去噪网络，协同空间特征共同指导潜在空间的去噪过程，有效解决了传统无监督方法中的语义漂移问题。
+
+最后，在 BraTS 2021 数据集上构建了 One-Class 异常检测实验基准。利用训练好的条件扩散模型对测试图像进行“加噪-去噪”重构，迫使潜在的肿瘤区域恢复为健康组织，并通过计算原始图像与重构图像的残差生成异常热力图。实验结果表明，该方法在图像级异常检测（Image-AUC）上达到了 \textbf{[在此处填入您的数据]}\%，在像素级定位（Pixel-AUC）上达到了 \textbf{[在此处填入您的数据]}\%。与自动编码器（AutoEncoder, AE）及生成对抗网络（Generative Adversarial Networks, GAN）等主流基线方法相比，本文方法显著提升了检测精度与定位的鲁棒性，展现了在辅助临床诊断方面的应用潜力。
+
+\end{abstractcn}
+
+\keywordscn{脑肿瘤检测；无监督异常检测；潜在扩散模型；视觉-语言模型；领域掩码网络} % 中文关键词
+
+\begin{abstracten} % 英文摘要
+
+Brain tumors are severe central nervous system diseases with high mortality rates, making early and accurate diagnosis crucial for treatment planning. Magnetic Resonance Imaging (MRI) is the clinical gold standard due to its superior soft-tissue contrast. However, existing supervised learning methods rely heavily on large-scale, pixel-level expert annotations and struggle to identify rare anomalies with long-tail distributions. To address these challenges, this thesis proposes an unsupervised anomaly detection and localization algorithm for brain MRI based on Text-Guided Latent Diffusion Models (LDM). Utilizing a reconstruction-based paradigm, the model is trained exclusively on healthy data to precisely identify pathological lesions. The main contributions of this study are as follows:
+
+First, to address the loss of anatomical structural details in purely text-guided reconstruction, a Spatial Feature Condition Modeling method based on Domain Masked Networks is designed. This module employs a hybrid architecture, utilizing Convolutional Neural Networks (CNN) to extract local texture features from T2-weighted Fluid Attenuated Inversion Recovery (T2-FLAIR) modalities. A feature-level Domain Masked strategy is introduced to randomly mask parts of the features, preventing the model from learning identity mappings. Subsequently, a Transformer is applied to capture long-range inter-pixel dependencies, generating spatial feature vectors with global anatomical layout awareness. These features provide strong geometric constraints for the diffusion generation process, ensuring the reconstructed images strictly adhere to normal brain topology.
+
+Second, to enhance the model's understanding of fine-grained medical semantics, a semantic guidance mechanism based on Vision-Language Models (VLM) is proposed. By constructing Expert Prompt Engineering incorporating anatomical priors, text embedding vectors describing normal brain features (e.g., ventricles, sulci) are generated using pre-trained VLMs. These vectors are injected into the denoising network via cross-attention mechanisms, collaborating with spatial features to guide the denoising process in the latent space, effectively resolving the semantic drift issue common in traditional unsupervised methods.
+
+Finally, a One-Class anomaly detection benchmark is established on the BraTS 2021 dataset. The trained conditional diffusion model reconstructs test images through a "noise-denoise" process, forcing potential tumor regions to revert to healthy tissue. Anomaly heatmaps are generated by calculating the residuals between the original and reconstructed images. Experimental results demonstrate that the proposed method achieves an Image-AUC of \textbf{[Fill Data Here]}\% and a Pixel-AUC of \textbf{[Fill Data Here]}\%. Compared with mainstream baselines such as AutoEncoders (AE) and Generative Adversarial Networks (GAN), this method significantly improves detection accuracy and localization robustness, demonstrating great potential for assisting clinical diagnosis.
+
+\keywordsen{Brain Tumor Detection; Unsupervised Anomaly Detection; Latent Diffusion Models; Vision-Language Models; Domain Masked Networks}
+
+\end{abstracten}
+
+\tableofcontents % 生成目录
+
+% 按照开题报告要求，跳过前置的摘要页，直接进入正文
+\mainmatter
+
+% ---------------------------------------------------------------------------------------------
+% 第一章 绪论 (扩充润色版)
+% ---------------------------------------------------------------------------------------------
+\section{绪论}
+
+\subsection{研究背景与意义}
+
+脑部肿瘤作为中枢神经系统最常见的病变之一，严重威胁着人类的生命健康与生活质量。其中，脑胶质瘤（Glioma）具有极高的致死率、致残率以及术后复发率，在原发性恶性脑肿瘤中占比极高。据相关临床统计，恶性胶质瘤患者的平均中位生存期往往不足两年，因此，实现肿瘤的早期发现、精准分级与精确定位，对于制定有效的手术规划及后续的放化疗方案至关重要。
+
+目前，磁共振成像（Magnetic Resonance Imaging, MRI）凭借其无电离辐射、多参数多序列成像以及对软组织极高的高分辨能力，已全面取代传统的影像手段，成为临床脑部疾病诊断的“金标准”。
+
+如图 \ref{fig:mri_device} 所示，现代医用超导 MRI 设备是一个高度精密的系统，主要由主磁体、梯度线圈、射频传输系统及计算机重建系统组成。其核心物理原理是将人体置于均匀的强静磁场中（临床常用 1.5T 或 3.0T），利用特定频率的射频脉冲激发人体组织内的氢原子核发生核磁共振现象。在射频脉冲停止后，接收线圈采集原子核恢复到平衡状态过程中释放的弛豫信号，最后经由计算机进行傅里叶变换等复杂的数学运算，重建出人体内部精细的断层图像。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth, height=6cm, keepaspectratio]{MRI device.png} 
+    \caption{典型的医用超导磁共振成像（MRI）扫描设备外观示意图}
+    \label{fig:mri_device}
+\end{figure}
+
+尽管 X 射线计算机断层扫描（Computed Tomography, CT）因其成像速度快、成本低，在急性脑出血和颅骨骨折的急诊排查中应用广泛，但在脑肿瘤等软组织病变的诊断上，MRI 具有不可替代的优势。如图 \ref{fig:ct_vs_mri} 所示，CT 成像基于组织对 X 射线的电子密度衰减差异，导致其对脑灰质、白质及肿瘤组织的对比度较低。相比之下，MRI 利用质子在不同组织环境中的 T1（纵向弛豫）和 T2（横向弛豫）特性，能够清晰呈现脑沟回的解剖结构。特别是 T2 加权液体衰减反转恢复（T2-weighted Fluid Attenuated Inversion Recovery, T2-FLAIR）序列，能够有效抑制脑脊液信号，使病灶周围的血管源性水肿呈现高亮信号，从而极大地提高了肿瘤检出的灵敏度。因此，MRI，尤其是 T2-FLAIR 模态，是本课题数据来源的首选。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth, height=6cm, keepaspectratio]{MRIvsCT.jpg} 
+    \caption{脑部同层面 CT 与 MRI 成像效果对比。 CT 图像对脑实质的灰白质对比度较差，病灶显示不清；MRI 图像具有极高的软组织分辨率，能够清晰呈现解剖细节与病理特征。}
+    \label{fig:ct_vs_mri}
+\end{figure}
+
+然而，随着现代医疗影像设备的普及，产生的影像数据量呈爆炸式增长。传统的诊断模式完全依赖放射科医生进行人工阅片，这不仅耗时费力，导致诊断效率难以满足日益增长的临床需求，且极易受医生主观经验、疲劳程度及视觉局限性的影响，存在漏诊误诊的风险。虽然近年来以卷积神经网络（Convolutional Neural Networks, CNN）为代表的深度学习技术发展迅速，但主流的有监督学习方法（如经典的 U-Net 分割网络）在临床落地中面临两大痛点：
+第一，数据标注成本高昂。有监督模型高度依赖于海量且带有像素级精细标注的“图像-掩膜”对，获取这些标注需要资深放射科医生投入大量时间逐层勾画，成本极高且难以扩展。
+第二，泛化能力受限。脑部病灶的形态、大小、位置及纹理极具异质性，且部分罕见病变数据稀缺，构成了典型的长尾分布。有监督模型往往难以识别训练集中未曾出现的异常类型，导致在面对未知或罕见病变时容易失效（即“闭集”限制）。
+
+针对上述问题，本课题提出基于扩散模型（Diffusion Models）的无监督异常检测（Unsupervised Anomaly Detection, UAD）研究方案。其核心采用“以正推异”的逆向思维：仅利用易于获取的大量健康人脑 MRI 数据训练模型，使其充分掌握正常脑组织的解剖规律与纹理分布。在推理阶段，模型会将输入的潜在病变图像强制“修复”为健康形态，通过比较修复前后的差异（即残差图）即可自动定位肿瘤区域。这种方法从根本上解决了对大规模病灶标注数据的依赖，大幅降低了算法开发的边际成本，并显著提升了模型对未见异常类型的泛化捕捉能力。
+\subsection{国内外研究现状}
+
+脑部 MRI 异常检测主要面临数据标注稀缺与病灶形态多变的双重挑战。针对这一难题，基于“仅利用健康数据训练”的无监督异常检测范式已成为当前研究的主流。纵观近年来的发展，相关技术路线经历了从有监督学习（Supervised Learning）的U-Net网络，到基于自动编码器（AutoEncoder,AE）和生成对抗网络（Generative Adversarial Networks, GAN）的传统生成模型，向基于去噪扩散概率模型（DDPM）的演进，并正逐步向融合视觉-语言模型（VLM）的多模态方向发展。
+
+\subsubsection{基于 U-Net 神经网络的有监督分割方法}
+
+
+在深度学习应用于医学影像分析的早期阶段，有监督学习（Supervised Learning）占据了绝对的主导地位。2015 年，Ronneberger 等人提出了 \textbf{U-Net} 网络架构，凭借其独特的对称编解码结构，成为了医学图像分割与重构领域的“里程碑”式工作\upcite{ronneberger2015u}。
+
+U-Net 及其衍生变体（如 3D U-Net, V-Net, nnU-Net）的核心优势在于其巧妙的架构设计：由收缩路径（Contracting Path，即编码器）和扩张路径（Expanding Path，即解码器）组成。编码器通过连续的卷积和池化操作提取图像的高维语义特征，捕获上下文信息（Context）；而解码器则通过上采样操作逐步恢复图像的空间分辨率，实现像素级的精确定位。更为关键的是，U-Net 引入了跳跃连接（Skip Connections）机制，将编码器深层的低分辨率特征与解码器对应层的高分辨率特征进行拼接（Concatenation）。这种机制有效地解决了深层网络中的梯度消失问题，并弥补了下采样过程中丢失的空间位置信息，使得模型在边缘分割和微小病灶重构上表现出卓越的性能。
+
+在脑部肿瘤检测领域，基于 U-Net 的全监督方法长期占据着 BraTS（Brain Tumor Segmentation）等权威挑战赛的榜首。2016 年，Milletari 等人针对医学图像中前景与背景极度不平衡的问题，提出了 V-Net 模型，并引入了基于 Dice 系数的损失函数，显著提升了体积分割的精度\upcite{milletari2016v}。随后于 2021 年，Isensee 等人提出了 \textbf{nnU-Net}（no-new-Net）框架，通过自适应地配置预处理、网络拓扑及训练策略，证明了在拥有充足标注数据的情况下，标准的 U-Net 架构足以击败各种复杂的魔改模型，被公认为当前有监督医学分割的 SOTA（State-of-the-Art）基准\upcite{isensee2021nnu}。
+
+尽管基于 U-Net 的有监督方法在特定任务上达到了极高的精度，但其在临床大规模推广中面临着两个难以逾越的障碍，这也正是本课题转向无监督研究的根本原因：
+
+首先是“标注瓶颈（Annotation Bottleneck）”。有监督模型不仅需要海量的训练数据，更依赖于高质量的像素级专家标注（Pixel-level Annotation）。在脑部 MRI 中，勾画一个胶质瘤的三维体积往往需要资深放射科医生耗费数小时，这使得构建大规模、全覆盖的标注数据集成本极其高昂且不可持续。
+
+其次是“闭集限制（Closed-set Limitation）”。有监督模型只能识别训练集中预先定义好的病变类别（如特定的神经胶质瘤）。面对临床环境中可能出现的罕见病变（如非典型脑膜瘤、转移瘤）或具有未知形态的新发病灶，模型往往会将其误判为背景，即缺乏对“未知异常”的发现能力。相比之下，本课题所采用的基于重构的无监督范式，通过学习健康数据的分布来识别所有偏离正常的“异类”，从原理上突破了有监督方法的类别限制。
+
+
+
+\subsubsection{基于生成式的无监督重构方法}
+\textbf{1） 基于自动编码器（AE）的重构异常检测}
+
+自动编码器及其变体，对抗自编码器 AE是早期无监督异常检测领域的主流方法。其基本架构包含编码器（Encoder）和解码器（Decoder）两部分：编码器将高维输入图像 $x$ 映射为低维潜在向量 $z$，迫使模型捕捉数据中的核心语义特征；解码器则尝试从 $z$ 中重构出原始图像 $\hat{x}$。
+
+在脑部 MRI 异常检测任务中，AE 类方法遵循“仅在健康数据上训练（One-Class Training）”的范式。其核心假设基于流形学习理论（Manifold Learning Theory）：健康脑部解剖结构在潜在空间中形成紧凑的流形分布，而肿瘤等异常区域不属于该分布。因此，当模型输入包含病灶的测试图像时，由于潜在空间缺乏对异常模式的表达能力，解码器理论上无法正确还原病灶区域，从而在重构图像与原始图像之间产生显著的残差（Residual）。2018 年，Baur 等人系统性地验证了深层自动编码器在脑部 MRI 异常分割中的有效性，通过设定阈值对残差图进行分割，实现了初步的异常定位\upcite{baur2018deep}。
+
+为了进一步规范潜在空间的分布特性，2013 年，Kingma 等人提出了变分自编码器（Variational AutoEncoder, VAE），引入概率图模型思想，将潜在变量建模为高斯分布，并通过优化证据下界（ELBO）来平衡重构误差与 KL 散度\upcite{kingma2013auto}。这使得潜在空间更加连续平滑，避免了过拟合。
+
+然而，基于 AE 的方法在实际应用中面临著名的“泛化性悖论（Generalization Paradox）”。由于卷积神经网络（CNN）具有强大的特征拟合能力，且主要关注图像的高频纹理而非全局语义，模型往往倾向于学习“恒等映射（Identity Mapping）”。这意味着即便模型从未见过肿瘤，它也能通过纹理复制的方式“完美重构”出异常区域，导致残差图中缺乏明显的异常信号，从而造成漏检。
+针对这一问题，后续研究提出了多种改进策略。例如，2019 年，Gong 等人提出了记忆增强自动编码器（Memory-augmented AutoEncoder, MemAE），引入了一个由正常解剖模式构成的记忆矩阵（Memory Bank）。在推理阶段，模型不直接使用编码器的输出，而是从记忆矩阵中检索最相似的“正常”特征项进行线性组合。这种机制强制解码器仅使用“健康零件”来组装图像，从而显著抑制了异常区域的重构能力\upcite{gong2019memorizing}。尽管如此，AE 类方法通常使用 L2 损失函数（均方误差 MSE），这导致其生成的图像在边缘和纹理细节上往往较为模糊，限制了其在精细脑部 MRI 分析中的应用上限。
+
+\textbf{2） 基于生成对抗网络（GAN）的对抗异常检测}
+
+为了解决 AE 生成图像模糊的问题，2014 年，Goodfellow 等人首次提出了生成对抗网络（GAN），通过引入对抗训练机制，利用生成器（Generator）与判别器（Discriminator）之间的极小极大博弈（Minimax Game），能够生成具有高频细节的逼真图像。
+
+在该领域的应用方面，2017 年，Schlegl 等人发表了开创性的 AnoGAN 模型，建立了一种基于逆映射的检测范式。与 AE 的直接推断不同，AnoGAN 在测试阶段将异常检测视为一个迭代优化问题：对于给定的测试图像，固定预训练好的生成器参数，通过反向传播迭代更新输入噪声向量 $z$，试图在潜在空间中找到最能生成该测试图像的“最佳潜码”。最终的异常评分由像素空间的重构损失（Residual Loss）和判别器特征空间的判别损失（Discrimination Loss）加权构成\upcite{schlegl2017unsupervised}。
+虽然 AnoGAN 显著提升了图像清晰度，但其推理过程需要对每张图片进行数百次迭代优化，耗时极长，无法满足临床实时诊断的需求。针对这一缺陷，2018 年，Akcay 等人提出了 GANomaly，采用了“编码器-解码器-编码器”的独特架构，通过比较输入图像的潜在特征与重构图像的潜在特征之间的距离来判定异常，进一步提升了检测的鲁棒性\upcite{akcay2018ganomaly}。2019 年，Schlegl 等人又提出了改进版 f-AnoGAN，引入了一个额外的编码器网络将图像直接映射到潜在空间，将迭代搜索过程转化为一次性的前向推断，大幅提升了检测速度\upcite{schlegl2019f}。
+
+尽管基于 GAN 的方法在视觉质量上优于 AE，但其在医学影像分析中仍存在难以克服的局限性：
+首先是训练的不稳定性。生成器与判别器的平衡难以把控，容易导致梯度消失或梯度爆炸，使得模型难以收敛。
+其次是“模式崩塌（Mode Collapse）”问题。在训练过程中，模型可能仅学会生成部分常见的脑部解剖结构，而忽略了数据分布中的多样性（如不同年龄段的脑室大小差异），导致对某些正常变异的误报。
+最后是“幻觉（Hallucination）”风险。由于 GAN 具有强大的创造力，它偶尔会在重构的健康脑部图像中生成原本不存在的解剖结构（如虚假的脑沟或血管），这严重干扰了基于残差的异常定位准确性。
+
+
+\textbf{3）基于扩散模型的分布建模与异常修复}
+
+近年来，去噪扩散概率模型（Denoising Diffusion Probabilistic Models, DDPM）凭借其卓越的分布建模能力、训练稳定性和生成样本的高保真度，逐渐取代 GAN 成为生成式人工智能领域的新基准（State-of-the-Art）。与 GAN 的对抗博弈机制不同，扩散模型受非平衡热力学的启发，通过定义一个逐步施加高斯噪声的正向扩散过程（Forward Process）和一个通过神经网络学习去噪的逆向生成过程（Reverse Process）来模拟数据分布\upcite{ho2020denoising}。
+
+在无监督异常检测（UAD）领域，基于扩散模型的方法主要遵循“重构修复”范式，其核心假设在于：扩散模型仅在健康数据上进行训练，因此学习到了正常解剖结构的先验分布（Prior Distribution）。当面对包含病灶的测试图像时，模型将其视为带有“噪声”或“损坏”的样本，倾向于将其投影回学习到的健康流形（Healthy Manifold）上。具体的实现路径主要分为以下两类：
+
+基于加噪-去噪的隐式修复策略。这一策略利用扩散模型的正向过程作为一种受控的信息破坏手段。对于待测 MRI 图像，首先向其添加特定强度的噪声，使其部分破坏原始的像素分布，尤其是破坏异常病灶的高频纹理特征；随后，利用预训练的去噪网络预测并去除噪声。由于网络从未见过肿瘤特征，它倾向于利用学习到的健康解剖上下文（Context）来填补被噪声破坏的区域，从而将肿瘤区域“修复”为健康组织。
+Mousakhan 等人提出的 DDAD（Denoising Diffusion Anomaly Detection）框架是该领域的代表性工作，通过调整加噪的时间步（Timestep）$t$，在保留原始图像大尺度语义结构与去除局部异常纹理之间寻找平衡\upcite{mousakhan2024anomaly}。然而，医学 MRI 具有高度的结构相关性，普通的高斯噪声容易破坏脑沟回等解剖边缘。对此，Kumar 等人创新性地引入单纯形噪声（Simplex Noise），这种噪声在空间上具有连续性，能迫使模型学习更鲁棒的长距离上下文依赖，从而显著提升了对微小病灶的敏感度\upcite{kumar2025self}。
+
+基于潜在扩散模型（LDM）的高效重构。尽管像素级扩散模型（Pixel-space Diffusion）生成效果细腻，但其计算开销巨大，推理速度极慢，难以满足临床实时处理的需求。Rombach 等人提出的潜在扩散模型（Latent Diffusion Models, LDM）通过引入感知压缩（Perceptual Compression）技术，利用预训练的变分自编码器（VAE）将高维图像空间映射到低维潜在空间（Latent Space），在保留核心语义信息的同时大幅降低了计算复杂度\upcite{rombach2022high}。
+
+在本课题所关注的脑部 MRI 场景中，LDM 展现出了独特的优势。Pinaya 等人首次将 LDM 应用于脑部异常检测，利用 VAE 的压缩特性过滤掉部分异常的高频信息，再通过扩散过程在潜在空间进行分布校正。这种方法不仅大幅提升了推理速度，还能利用潜在空间的抽象语义特征，缓解传统方法中常见的“结构漂移（Structure Drift）”问题——即模型在修复病灶时错误地改变了正常脑组织的解剖走向，导致虚假残差的产生。如何在高压缩率下保持细粒度的病灶定位能力，同时利用条件引导（Conditioning）机制约束生成过程，是当前该领域研究的热点。
+
+\subsubsection{视觉-语言模型（VLM）在医学影像中的前沿探索}
+
+随着 CLIP（Contrastive Language-Image Pre-training）、Qwen-VL 等大规模视觉-语言模型（Vision-Language Models, VLM）的爆发，利用自然语言辅助视觉任务成为人工智能领域的新范式。VLM 通过在海量图文对（Image-Text Pairs）上进行对比学习预训练，成功建立了视觉特征空间与文本特征空间之间的语义对齐（Semantic Alignment）。这一突破使得模型能够通过文本提示（Prompt）来理解图像内容，展现出惊人的零样本（Zero-shot）迁移能力。
+
+在异常检测领域，VLM 的引入旨在解决纯视觉模型“语义盲目”的问题。传统的无监督方法仅依赖像素统计规律，缺乏对图像内容的显式理解。而 VLM 允许引入人类知识作为先验。例如，WinCLIP 方法通过构建包含“完美物体”与“受损物体”描述的文本提示模版，直接计算图像与不同文本描述的相似度来实现异常分类，无需任何训练样本\upcite{jeong2023winclip}。
+
+具体到生成式异常检测中，VLM 主要扮演“语义引导者”的角色：
+
+ \textbf{1）文本引导的生成与修复}：Hicsonmez 等人提出的 VLMDiff 将 VLM 生成的图像描述作为语义条件注入扩散模型。通过输入如“一张健康的物体图片”等文本提示，利用交叉注意力机制（Cross-Attention）引导去噪过程向正常语义收敛，有效减少了纯视觉模型因纹理模糊而产生的语义歧义\upcite{hicsonmez2025vlmdiff}。
+
+
+\textbf{2）细粒度语义对齐}：针对 CLIP 模型直接用于异常检测时粒度过粗的问题（主要关注中心物体而忽略局部缺陷），Cao 等人提出的 AdaCLIP 设计了混合可学习提示（Hybrid Learnable Prompts），通过优化提示词向量来适应不同的工业缺陷检测场景\upcite{cao2024adaclip}。在医学领域，Fan 等人提出的 FineGrainedAD 针对医学影像的特殊性，尝试利用多层级文本描述来辅助定位微小病灶\upcite{fan2025towards}。
+
+
+尽管上述工作展示了 VLM 的巨大潜力，但直接将其迁移至脑部 MRI 异常检测仍面临巨大的“领域鸿沟（Domain Gap）”：
+首先，通用的 VLM（如 CLIP）主要在自然图像（如 ImageNet、LAION）上训练，缺乏对医学专业术语（如“脑室”、“T2-FLAIR 高信号”）的理解能力。
+其次，现有的文本引导方法大多未能充分考虑脑部复杂的解剖拓扑结构。简单的文本描述（如“正常的大脑”）无法提供精确的空间约束，导致生成模型在修复过程中容易丢失解剖细节。
+这正是本课题的研究切入点：即如何设计包含解剖学先验的“专家提示工程（Expert Prompt Engineering）”，并结合空间结构约束，将 VLM 的通用语义理解能力转化为对特定医学病灶的精准定位能力。
+
+
+\subsection{研究内容和研究目标}
+本课题旨在构建一种基于潜在扩散模型（Latent Diffusion Models, LDM）的脑部 MRI 无监督异常检测与定位算法。LDM 通过在低维潜在空间进行扩散过程，大幅降低了计算复杂度。本研究的具体目标包括：建立基于 BraTS 2021 数据集的 One-Class 实验基准；提出融合空间结构与语义信息双重引导的条件机制，解决重构过程中的结构漂移问题；最终实现对脑胶质瘤的像素级精准定位。如图 \ref{fig:research_objectives} 所示为本课题的核心研究目标概览。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth, height=6cm, keepaspectratio]{whereAD.png} 
+    \downcaption{课题研究核心目标图}
+    \label{fig:research_objectives}
+\end{figure}
+
+为了实现上述目标，本论文将围绕以下三个核心层面展开深入研究：
+
+1. \textbf{基于领域掩码网络的空间特征条件建模}：
+针对纯生成模型在重构过程中容易丢失原始解剖结构细节的问题，研究构建混合架构的空间特征提取模块。该模块首先利用卷积神经网络（CNN）提取 T2-FLAIR 图像具有平移不变性的局部纹理特征。为了增强模型对上下文信息的推断能力并防止模型在训练阶段发生“死记硬背”（即恒等映射），引入领域掩码（Masked）策略，随机遮蔽部分特征块。随后，应用 Transformer 架构处理未被遮蔽的特征序列，通过自注意力机制捕获像素间的长距离依赖关系，最终生成具备全局解剖布局感知的空间特征向量。该特征将作为强几何约束，确保模型生成的图像严格遵循原始脑部的拓扑结构。
+
+2. \textbf{基于 VLM 的细粒度医学语义文本生成}：
+研究视觉-语言模型（如 CLIP, Qwen-VL 等）在医学影像中的跨模态对齐与迁移能力。针对传统提示词过于笼统的问题，设计包含解剖学先验的专家提示工程（Expert Prompt Engineering），例如详细描述脑室的形状、脑沟回的纹理等正常形态。利用预训练的 VLM 对训练集中的健康切片进行批量推理，生成包含全局模态信息与局部纹理细节的文本描述，并利用文本编码器将其编码为高维语义向量。这一过程旨在将人类医学知识注入到纯视觉模型中，提升模型对“正常解剖”的语义理解。
+
+3. \textbf{多条件引导下的潜在扩散重构模型构建}：
+为了降低高分辨率医学图像的计算开销，研究基于变分自编码器（VAE）的感知压缩技术，将图像映射至低维潜在空间。在此基础上，搭建 U-Net 结构的去噪网络。本部分重点研究如何将前述两部分特征进行有效融合：即，将领域掩码网络提取的全局空间结构特征（内容一）作为额外的条件通道（Conditional Channel）嵌入模型，同时通过交叉注意力（Cross-Attention）机制注入由 VLM 生成的细粒度语义文本向量（内容二）。通过这种“空间+语义”的双重引导机制，指导去噪过程严格向“正常解剖结构”收敛，防止正常组织被误改。最后，从图像级别（Image-level）和像素级别（Pixel-level）综合评估模型的异常检测性能，并设计基于 L1 距离的异常评分机制，生成高精度的异常热力图，实现对脑肿瘤的自动定位。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{基于领域掩码网络的空间特征条件建模}
+\subsection{基于 CNN 的多尺度局部特征编码}
+\label{subsec:cnn_encoding}
+
+在构建基于领域掩码网络的空间特征条件建模模块时，首要任务是将输入的原始磁共振影像（MRI）转化为富含语义信息的高维特征表示。尽管 Transformer 架构在捕捉全局长距离依赖方面表现卓越，但其在处理底层视觉信号时缺乏归纳偏置（Inductive Bias），即对图像局部性（Locality）和平移不变性（Translation Invariance）的先天假设。对于脑部 T2-FLAIR 模态影像而言，病灶的边缘、脑沟回的纹理以及灰白质的界限等关键解剖信息均蕴含在局部像素邻域内。若直接将原始像素展平输入 Transformer，不仅会带来巨大的计算开销，且模型难以有效地聚焦于这些细微的底层视觉特征。
+
+因此，本研究设计了一个基于卷积神经网络（Convolutional Neural Networks, CNN）的深层局部特征提取器。该模块作为“视觉词法分析器（Visual Tokenizer）”，负责在进入 Transformer 全局建模之前，对图像进行多尺度的空间下采样与通道维度的语义升维，为后续的掩码建模提供紧凑且富有表现力的“视觉 Token”。
+
+
+为了在保留关键解剖细节的同时实现特征的空间压缩，本研究构建了一个多级级联的卷积编码网络 $\mathcal{E}_{cnn}$。如图 \ref{fig:cnn_structure} 所示，该网络摒弃了传统的大卷积核设计，转而采用堆叠的小尺寸卷积核（$3 \times 3$）策略，旨在通过增加网络深度来获得更大的有效感受野（Effective Receptive Field），同时控制参数量。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][6cm]{0.9\textwidth}{\centering 待补充：CNN编码器的详细层级结构图（展示特征图尺寸变化 $H \to H/2 \to H/4 \to H/8$ 及通道数变化 $1 \to 16 \to 256$）}}
+    \caption{多尺度局部特征编码器 $\mathcal{E}_{cnn}$ 的网络拓扑结构示意图}
+    \label{fig:cnn_structure}
+\end{figure}
+
+具体而言，对于输入的单通道 T2-FLAIR 切片 $x \in \mathbb{R}^{H \times W \times 1}$，编码过程可以形式化地描述为一系列卷积操作 $\mathcal{F}_{conv}$ 与非线性激活 $\sigma$ 的复合函数。我们设计的网络包含四个主要的特征提取阶段（Stage），每个阶段内部包含特征提取层与下采样层：
+
+\textbf{1. 浅层特征提取阶段（Stage 1）：}
+输入图像首先经过两层连续的卷积操作。第一层卷积负责将单通道图像映射到特征空间（$C_{in}=1 \to C_{out}=16$），第二层卷积在保持分辨率不变的情况下进一步提炼纹理特征。此阶段的卷积步长（Stride）设定为 1，填充（Padding）设定为 1，以保证特征图的空间尺寸与原图一致。数学表达如下：
+\begin{equation}
+    F_1 = \sigma(W_2  \sigma(W_1  x + b_1) + b_2)
+\end{equation}
+其中，$w$ 表示二维卷积运算，$W_k$ 和 $b_k$ 分别表示第 $k$ 层的卷积核权重与偏置。此阶段提取的特征主要对应于图像中的边缘、角点等高频信息。
+
+\textbf{2. 语义抽象与空间降维阶段（Stage 2 - Stage 4）：}
+随后的三个阶段构成了特征编码的核心。每个阶段的起始层均采用步长为 2 的卷积操作（Stride=2 Convolution）代替传统的最大池化（Max Pooling）。这种设计允许网络在下采样的过程中通过学习权重来自适应地选择保留哪些信息，避免了池化操作可能带来的细节丢失。
+随着网络深度的增加，我们依照“空间换通道（Space-for-Channel）”的设计原则，逐步增加特征通道数。具体变化路径为：$16 \to 32$（Stage 2），$32 \to 96$（Stage 3），$96 \to 256$（Stage 4）。最终输出的特征图 $F_{local}$ 的维度为 $256 \times (H/8) \times (W/8)$。
+
+这一层次化的通道扩张设计具有深刻的理论依据：在浅层，特征图分辨率高，主要编码几何纹理；在深层，分辨率降低，为了能够区分复杂的解剖结构（如区分肿瘤核心与水肿带），需要更高维度的特征空间来承载丰富的语义组合。最终的 256 维特征向量不再代表单一的像素强度，而是对应于原图中 $8 \times 8$ 区域内的高度抽象的解剖概念。
+
+
+在激活函数采用了 SiLU（Sigmoid Linear Unit，又称为 Swish）激活函数。SiLU 函数定义为输入与其 Sigmoid 函数的乘积：
+\begin{equation}
+    \text{SiLU}(x) = x \cdot \sigma(x) = x \cdot \frac{1}{1 + e^{-x}}
+\end{equation}
+
+
+卷积神经网络的核心属性在于其感受野（Receptive Field, RF）。为了确保最终生成的每一个特征 Token 都能充分感知到足够的解剖上下文，我们必须严格计算编码器的有效感受野。
+
+对于第 $l$ 层卷积，其感受野 $r_l$ 与上一层感受野 $r_{l-1}$ 的关系满足递归公式：
+\begin{equation}
+    r_l = r_{l-1} + (k_l - 1) \times j_{l-1}
+\end{equation}
+其中，$k_l$ 为卷积核大小（本研究中固定为 3），$j_{l-1}$ 为累积步长（Cumulative Stride）。由于我们在 Stage 2, 3, 4 分别进行了步长为 2 的下采样，累积步长呈指数级增长：$j_{out} = 2 \times 2 \times 2 = 8$。
+
+经过 8 层 $3 \times 3$ 卷积的堆叠，理论感受野涵盖了输入图像中相当大的区域。这意味着，特征图 $F_{local}$ 中的每一个点 $f_{i,j}$，虽然在空间上仅占据 $1 \times 1$ 的位置，但其数值实际上聚合了原图中超过 $30 \times 30$ 像素范围内的上下文信息。
+
+这种多尺度信息的聚合对于后续的“领域掩码”操作至关重要。我们在后续章节中实施的掩码操作是基于特征图进行的。由于特征图的一个点已经包含了原图的一个局部块（Patch）的信息，在特征图上进行 $1 \times 1$ 的掩码，等效于在原图上遮挡了一个 $8 \times 8$ 的连续区域。这保证了掩码操作具有足够的“破坏力”，能够彻底抹除潜在病灶的局部纹理，迫使模型必须依赖远距离的全局上下文（如脑部的对称性）来进行重构，从而完美契合了“以正推异”的异常检测逻辑。
+
+综上所述，基于 CNN 的多尺度局部特征编码模块不仅完成了从像素空间到特征空间的映射，更通过层级化的下采样和通道扩张，实现了视觉信息的语义压缩。它生成的特征图 $F_{local}$ 兼具高频纹理细节与中层解剖语义，为后续基于 Transformer 的全局关联建模提供了高质量的输入基元。
+
+
+
+
+\subsection{邻域屏蔽机制与掩码矩阵构建}
+\label{subsec:neighbor_mask}
+
+在无监督异常检测的图像重构任务中，模型面临着一个根本性的矛盾：即“强大的重构能力”与“对异常的敏感性”之间的权衡。传统的卷积神经网络（CNN）由于其卷积核的局部共享特性，具有极强的纹理拟合能力。当输入包含肿瘤的脑部 MRI 图像时，模型往往倾向于寻找一条“捷径（Shortcut）”，即直接利用感受野内的局部高频纹理信息，通过像素级的恒等映射（Identity Mapping）来完美还原输入。这种“死记硬背”式的重构会导致病灶区域被原样保留，使得输入图像与重构图像之间的残差极小，从而导致异常检测算法的失效（漏检）。为了从根本上阻断这种局部信息的直接泄露，本研究提出了一种基于确定性邻域屏蔽（Neighborhood Masking）的注意力偏置策略。该策略的核心思想是“由远及近”的逆向推断：强制模型在推断特征图中任意位置的语义表示时，对其空间邻域内的所有信息视而不见，仅允许利用图像中远距离的全局上下文信息（如脑组织的对称性、宏观解剖布局）进行重构。
+
+为了在数学上严格定义这一屏蔽机制，首先需要构建特征空间中的邻域拓扑结构。假设经由前端卷积编码器提取的特征图为 $F \in \mathbb{R}^{h \times w \times d}$，我们将特征图展平为长度为 $L = h \times w$ 的节点序列。对于序列中的任意一个查询节点（Query Node）$u$，其对应的二维空间坐标记为 $(i_u, j_u)$。我们定义节点 $u$ 的邻域集合 $\mathcal{N}_u$ 为以该点为中心、空间窗口大小为 $K \times K$ 的矩形区域内所有特征点的集合。这里引入切比雪夫距离（Chebyshev Distance，即 $L_\infty$ 范数）来形式化描述这一空间约束：
+
+\begin{equation}
+    \mathcal{N}_u = \left\{ v \in \{1, \dots, L\} \mid \max(|i_u - i_v|, |j_u - j_v|) \le \lfloor \frac{K}{2} \rfloor \right\}
+\end{equation}
+
+其中，$K$ 对应于超参数 $neighbor_size$领域掩码的范围 。尽管该邻域在下采样后的特征图上仅覆盖局部区域，但考虑到卷积神经网络层级累积的有效感受野（Effective Receptive Field），该区域在原始分辨率图像上实际上对应着包含潜在病灶及其周边水肿带的较大解剖范围。屏蔽该区域意味着切断了病灶自身纹理信息向特征表达传播的物理路径。
+
+基于上述邻域定义，我们构建了一个与自注意力图（Attention Map）尺寸严格对应的掩码偏置矩阵 $M \in \mathbb{R}^{L \times L}$。不同于自然语言处理中常用的上三角因果掩码，本研究设计的掩码矩阵具有特殊的带状稀疏结构。矩阵中的每一个元素 $M_{u,v}$ 代表了查询节点 $u$ 与键值节点 $v$ 之间的可访问性偏置。其赋值规则如下：
+
+\begin{equation}
+    M_{u,v} = 
+    \begin{cases} 
+    -\infty, & \text{if } v \in \mathcal{N}_u \quad (\text{即 } v \text{ 位于 } u \text{ 的屏蔽邻域内}) \\
+    0, & \text{otherwise} \quad (\text{即 } v \text{ 位于 } u \text{ 的全局背景区域})
+    \end{cases}
+\end{equation}
+
+该矩阵的物理意义在于构建一道“信息防火墙”。如图 \ref{fig:mask_matrix_construction} 所示，在矩阵的可视化热力图中，对角线及其附近的带状区域呈现为深色（代表负无穷大），而远离对角线的区域呈现为浅色（代表零）。当该矩阵被注入到后续 Transformer 的 Softmax 计算环节时，根据公式 $\lim_{x \to -\infty} e^x = 0$，所有落入屏蔽邻域 $\mathcal{N}_u$ 内的键值对的注意力权重将被强制归零。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][6cm]{0.85\textwidth}{\centering 
+    待补充图片：邻域屏蔽掩码矩阵的构建原理与可视化 \\ 
+    \small \textbf{左图}：特征图空间示意，展示中心点（红色）及其 $K \times K$ 邻域（灰色阴影）；\\
+    \small \textbf{右图}：对应的 $L \times L$ 掩码矩阵热力图，展示对角线附近的“盲区”带状结构。
+    }}
+    \caption{邻域屏蔽掩码矩阵构建示意图。左图展示了基于切比雪夫距离的空间邻域定义；右图展示了对应的注意力偏置矩阵，其中深色区域（$-\infty$）阻断了局部信息的流动，迫使模型仅关注远距离的全局上下文。}
+    \label{fig:mask_matrix_construction}
+\end{figure}
+
+这种机制将异常检测转化为一种特殊的“盲点修复（Blind-spot Inpainting）”任务。对于特征图上的每一个点，模型都处于“灯下黑”的状态，无法看见该点及其周边的原始像素。因此，为了生成该点的特征表示，模型被迫去寻找与该点具有长程相关性的健康区域。例如，在处理左脑半球的潜在肿瘤区域时，由于局部信息被屏蔽，模型会自发地利用右脑半球对称位置的健康特征，结合脑室、颅骨等宏观解剖地标的相对位置关系，来推断该区域应有的健康形态。这种强制性的全局上下文依赖，不仅有效抑制了对异常纹理的重构，还使得生成的特征图蕴含了丰富的健康解剖先验，为后续扩散模型的去噪过程提供了强有力的结构引导。
+
+
+
+\subsection{基于 Transformer 的全局上下文聚合}
+\label{subsec:transformer_agg}
+
+在经由前述卷积神经网络提取得到局部特征图，并构建了基于邻域屏蔽的注意力掩码矩阵之后，本研究的核心任务转变为如何利用这些离散的、被屏蔽了局部信息的特征点，重构出具有全局解剖一致性的空间条件向量。为此，我们引入了基于 Transformer 的全局上下文聚合模块。与 CNN 受限于局部感受野不同，Transformer 凭借其自注意力机制（Self-Attention Mechanism），能够直接建立图像中任意两个位置之间的依赖关系，从而捕获跨越整个脑部的长距离语义关联（Long-range Dependencies）。这一特性对于“以正推异”的异常检测至关重要，因为它允许模型利用远离病灶区域的健康脑组织（如对侧脑半球的对称结构）来推断并修复潜在的异常区域。
+
+由于 Transformer 的输入必须是二维序列而非三维张量，我们首先通过重排操作（Rearrange）将尺寸为 $B \times C \times H \times W$ 的特征图展平为长度为 $L = H \times W$ 的视觉序列（Visual Tokens）。然而，这一展平过程不可避免地破坏了特征点在原始图像中的二维拓扑结构信息。在医学脑部影像中，解剖结构的绝对位置（例如，脑室位于中央，皮层位于边缘）包含着极强的先验信息，对于判断结构的合理性至关重要。为了弥补这一空间信息的缺失，我们在进入注意力层之前，引入了显式的二维正弦位置编码（2D Sinusoidal Position Embedding）。该编码策略通过不同频率的正弦和余弦函数，为每一个特征 Token 赋予唯一的空间坐标标识。
+
+\begin{equation}
+    P_{(pos, 2i)} = \sin\left(\frac{pos}{10000^{2i/d_{model}}}\right), \quad P_{(pos, 2i+1)} = \cos\left(\frac{pos}{10000^{2i/d_{model}}}\right)
+\end{equation}
+
+具体而言，对于特征图上的任意位置 $(x, y)$，我们分别计算其横坐标和纵坐标的位置向量，并将两者拼接或叠加，生成最终的位置嵌入 $P_{xy} \in \mathbb{R}^C$。该位置向量与视觉特征序列相加后输入编码器，确保了模型在后续的全局交互中始终“知晓”每个特征点在解剖空间中的确切方位，从而维持脑部结构的整体几何布局稳定性。
+
+全局上下文聚合的核心计算过程发生在多层堆叠的 Transformer 编码器中，其关键在于将前一节构建的邻域屏蔽掩码矩阵 $M$ 深度融入自注意力运算。形式化地，设第 $l$ 层的输入序列为 $Z^{(l-1)}$，通过线性投影矩阵 $W_Q, W_K, W_V$ 映射得到查询（Query）、键（Key）和值（Value）矩阵。标准的缩放点积注意力公式在此被修正为：
+
+\begin{equation}
+    \text{Attention}(Q, K, V) = \text{Softmax}\left( \frac{QK^T}{\sqrt{d_k}} + M \right) V
+\end{equation}
+
+在此公式中，掩码矩阵 $M$ 发挥了物理阻断作用。对于任意查询节点 $u$，由于其邻域 $\mathcal{N}_u$ 内对应位置在 $M$ 中的值为负无穷（$-\infty$），经过 Softmax 指数归一化后，这些位置的注意力权重 $\alpha_{u,v}$ 恒等于零。这意味着，模型在更新节点 $u$ 的特征表示时，被强制禁止“偷看”其周围 $K \times K$ 范围内的原始纹理信息。相反，输出特征 $z_u$ 只能由邻域之外的远距离特征点加权聚合而成。这种机制在特征空间内实现了一种隐式的“上下文修复（Contextual Inpainting）”：即便输入图像在位置 $u$ 存在高信号的肿瘤病灶，由于模型无法感知该位置及其周边的异常纹理，它只能根据全脑的解剖上下文（如利用左右脑对称性、脑沟回的宏观走向），“猜测”并生成该位置在健康状态下应有的特征表示。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering 待补充图片：基于 Transformer 的全局上下文聚合与特征重构流程图}}
+    \caption{Transformer 全局聚合过程示意图。通过位置编码注入空间信息，并利用掩码注意力机制聚合远距离特征，最终重构出仅包含健康解剖先验的空间条件图。}
+    \label{fig:transformer_agg_process}
+\end{figure}
+
+经过 $N$ 层编码器的深度交互，输出的特征序列不仅去除了局部的异常细节，还高度融合了全脑的健康解剖先验。最后，我们执行逆向的重排操作，将序列还原为二维空间特征图 $F_{spatial} \in \mathbb{R}^{B \times C \times H \times W}$。该特征图不再是对输入图像的简单复制，而是一张经由健康流形投影后的“解剖蓝图”。当这张蓝图作为条件控制信号（Control Signal）注入后续的扩散模型时，它将提供强有力的几何约束，指导去噪网络在生成逼真纹理的同时，严格遵循正常脑组织的拓扑结构，从而有效解决了传统生成模型中常见的结构漂移问题，为实现高精度的像素级肿瘤定位奠定了坚实基础。
+
+
+\subsection{本章小结}
+
+本章聚焦于解决无监督异常检测中重构模型容易产生恒等映射从而导致“死记硬背”的核心难题，提出了一种基于领域掩码网络的空间特征条件建模方法。
+
+首先，针对原始像素空间维度过高且语义稀疏的问题，本章构建了基于卷积神经网络的多尺度局部特征编码器。该模块作为视觉词法分析器，有效地提取了 T2-FLAIR 图像中包含边缘、纹理等高频信息的底层视觉特征，将其压缩为紧凑的特征 Token，为后续的全局建模奠定了基础。
+
+其次，为了阻断模型利用局部纹理直接复制病灶的“捷径”，本章创新性地设计了邻域屏蔽机制。通过构建基于切比雪夫距离的掩码矩阵，物理上阻断了特征点与其周围局部邻域的信息交互，迫使模型在重构过程中无法依赖病灶本身的像素信息，只能寻求远距离的上下文线索。
+
+最后，本章引入了基于 Transformer 的全局上下文聚合模块。利用自注意力机制捕获脑部解剖结构的长距离依赖关系（如对称性），在被屏蔽的特征空间内实现了隐式的“健康修复”。这一过程生成了仅包含健康解剖先验的空间条件特征，为后续扩散模型的去噪过程提供了强有力的几何结构约束，有效防止了结构漂移现象的发生。
+% ------------------------------
+\section{基于 VLM 的细粒度医学语义文本生成}
+
+尽管前述章节构建的基于领域掩码网络的空间特征模块能够通过物理屏蔽手段有效地捕捉脑部的几何解剖布局，但纯视觉的卷积神经网络或 Transformer 架构依然存在一个本质的局限性——“语义盲目性（Semantic Blindness）”。具体而言，视觉模型虽然能够通过像素统计规律恢复出“具有某种灰度分布的形状”，但它并不能真正理解该结构在医学影像学上对应的是“侧脑室”、“基底节”还是“脑沟”。这种对高层语义理解的匮乏，使得模型在处理外观相似但解剖意义截然不同的区域时，容易产生结构漂移或伪影，难以建立起真正的“健康脑部”概念。
+
+为了赋予模型对正常脑部解剖结构的深层认知能力，本研究引入了当前自然语言处理与多模态学习领域的 SOTA 模型——\textbf{Qwen3-30B}。利用其高达 300 亿参数的庞大知识库以及在海量多模态医学数据上的指令微调（Instruction Tuning）能力，我们旨在搭建一座桥梁，将人类放射科专家的隐式医学知识转化为显式的、细粒度的文本描述。这一过程不再依赖于简单的人工标签，而是通过生成式人工智能自发产生的详尽诊断报告，为异常检测模型提供强有力的语义条件引导。
+
+\subsection{医学专家提示工程与正常解剖描述生成}
+\label{subsec:prompt_engineering}
+
+为了赋予纯视觉模型对正常脑部解剖结构的深层认知能力，解决其在医学语义理解上的匮乏，本研究利用 Qwen3-30B 强大的多模态理解与生成能力，构建了医学专家提示工程（Medical Expert Prompt Engineering）。该模块的核心目标是将隐含在图像像素中的解剖学信息转化为显式的、细粒度的自然语言描述。不同于以往方法中仅使用简单的类别标签，本节旨在生成包含丰富解剖细节的稠密描述（Dense Caption），从而为后续的特征对齐提供高信息量的语义锚点。
+
+尽管通用的视觉-语言模型具备广泛的知识，但在面对 T2-FLAIR MRI 这种特定医学模态时，必须通过精确的指令（Instruction）来激活其专业领域的潜在知识。为了确保生成的文本能够精准描述健康脑部的解剖特征，我们设计了一套系统级的全英文指令策略。该策略摒弃了传统诊断中“寻找病灶”的逻辑，转而采用“正向解剖描述（Positive Anatomical Description）”范式，要求模型聚焦于正常组织的形态学特征。具体使用的提示词（Prompt）设计如下：
+
+\begin{quote}
+\textbf{Role:} Senior Neuroradiologist. \\
+\textbf{Task:} Analyze this axial T2-FLAIR brain MRI of a healthy subject. Generate a concise anatomical report of normal features. \\
+\textbf{Focus Requirements:} Please systematically evaluate the following regions: First, observe the \textbf{Ventricles}, noting their symmetry, shape, and characteristic hypointense signal; Second, examine the \textbf{Parenchyma} for homogeneity and distinct grey-white matter differentiation; Third, check the \textbf{Sulci/Gyri} to ensure normal folding patterns without effacement; Finally, confirm the \textbf{Overall} bilateral symmetry of hemispheric structures. \\
+\textbf{Constraint:} Output only healthy attributes suitable for medical reporting. Do not generate hallucinations or describe potential pathologies.
+\end{quote}
+
+上述提示工程的设计蕴含了三个层面的深层医学逻辑。首先是\textbf{角色设定（Role Assignment）}，通过设定“资深神经放射科医生”的上下文，有效诱导模型使用如“低信号（hypointense）”、“脑实质（parenchyma）”等专业术语，而非通俗的自然语言。其次是\textbf{先验植入（Prior Injection）}，明确告知模型输入图像来自“健康受试者”，强制模型挖掘图像中支持“健康”结论的视觉证据，从源头上抑制了大模型常见的幻觉问题（Hallucination）。最后是\textbf{关注点引导（Attention Guidance）}，通过在文本中显式列出脑室、脑实质、脑沟回等解剖结构，强迫模型的视觉注意力机制（Attention Map）遍历整个脑部区域，避免模型仅关注图像中心而忽略边缘细节。
+
+利用上述提示工程，我们对训练集中所有的健康脑部 MRI 切片进行了批量推理，生成了高质量的稠密文本描述。例如，模型针对某张训练图像生成的典型描述为：\textit{"The axial T2-FLAIR image demonstrates a normal brain anatomy. The bilateral lateral ventricles are symmetrical in size and shape, presenting with characteristic low signal intensity consistent with clear cerebrospinal fluid. The grey-white matter interface is well-preserved and distinct throughout both hemispheres..."}。这段生成的文本具有极高的利用价值，其中包含的 "symmetrical"（对称）、"distinct"（清晰）、"homogeneous"（均匀）等形容词，在经过后续的文本编码器处理后，将转化为高维特征空间中的强约束向量。它们定义了“正常的纹理”和“合理的结构”标准，能够有效指导扩散模型在去噪过程中抑制异常伪影的生成，确保重构图像严格遵循健康解剖学规律。
+
+
+
+
+
+
+
+\subsection{基于多头交叉注意力的语义条件注入机制}
+\label{subsec:cross_attention}
+
+在前一阶段，我们通过医学专家提示工程获得了富含解剖学先验的文本描述，并利用预训练文本编码器将其转化为高维语义嵌入序列 $C_{sem}$。然而，如何将这种非结构化的语义序列有效地融合进二维的视觉生成过程中，是本算法的核心难点。简单的特征拼接（Concatenation）无法处理跨模态数据的维度不匹配问题，且难以捕捉复杂的语义对应关系。为此，本研究在扩散模型的 U-Net 主干网络中设计了基于空间转换器（Spatial Transformer）的语义注入模块。该模块利用多头交叉注意力（Multi-Head Cross-Attention, MHCA）机制，在潜在特征空间内动态建立视觉像素与医学文本描述之间的深层逻辑关联，实现从“语义理解”到“视觉重构”的精准映射。
+
+\textbf{视觉-语义特征空间的维度对齐。} 
+在 U-Net 的去噪过程中，不同层级的中间特征图 $\phi(z_t) \in \mathbb{R}^{H \times W \times C}$ 包含了不同粒度的图像信息。为了引入文本条件，首先需要解决模态间的维度差异。我们将二维的视觉特征图在空间维度上展平，转化为视觉序列 $X_{vis} \in \mathbb{R}^{L \times C}$，其中 $L = H \times W$ 为视觉标记（Token）的数量。与此同时，文本编码器输出的语义条件为 $C_{sem} \in \mathbb{R}^{M \times D}$，其中 $M$ 为文本序列长度，$D$ 为语义特征维度。由于 $C$ 与 $D$ 通常并不一致，我们引入可学习的 $1 \times 1$ 卷积层对视觉特征进行通道变换，使其投影到与文本特征相同的潜在交互维度 $d_{model}$，从而为后续的注意力计算构建统一的度量空间。
+
+\textbf{多头交叉注意力机制的数学建模。} 
+为了捕捉视觉区域与多种解剖概念（如形状、纹理、位置）之间的复杂依赖，本研究采用多头机制代替标准的单头注意力。具体而言，我们将投影后的视觉序列作为查询（Query），将文本语义序列作为键（Key）和值（Value）。这一设计蕴含了明确的导向性逻辑：即“视觉图像主动向文本知识库查询其应有的健康形态”。
+对于第 $i$ 个注意力头（Head $i$），其计算过程定义如下：
+\begin{equation}
+    Q_i = X_{vis} \cdot W_Q^{(i)}, \quad K_i = C_{sem} \cdot W_K^{(i)}, \quad V_i = C_{sem} \cdot W_V^{(i)}
+\end{equation}
+其中，$W_Q^{(i)}, W_K^{(i)}, W_V^{(i)} \in \mathbb{R}^{d_{model} \times d_{head}}$ 为第 $i$ 个头的独立线性投影矩阵，$d_{head} = d_{model} / N_h$ 为每个头的维度，$N_h$ 为头数。随后，利用缩放点积（Scaled Dot-Product）计算视觉与语义的相关性权重，并加权聚合文本信息：
+\begin{equation}
+    \text{Head}_i = \text{Softmax}\left( \frac{Q_i K_i^T}{\sqrt{d_{head}}} \right) V_i
+\end{equation}
+在此公式中，Softmax 生成的注意力图（Attention Map）起到了关键的“语义导航”作用。例如，当 $Q_i$ 对应于图像中的脑室区域时，它会与 $K_i$ 中代表“低信号”、“对称”等描述词的向量产生高响应，进而抽取对应的 $V_i$ 向量。最终，多头注意力的输出通过拼接与线性变换融合：
+\begin{equation}
+    \text{MHCA}(X_{vis}, C_{sem}) = \text{Concat}(\text{Head}_1, \dots, \text{Head}_{N_h}) \cdot W_O
+\end{equation}
+
+\textbf{前馈网络与残差融合。} 
+单纯的注意力机制仅能捕捉线性相关性，为了增强模型的非线性表达能力并防止梯度消失，我们将 MHCA 嵌入到一个完整的 Transformer 块中。该块包含层归一化（Layer Normalization, LN）和前馈神经网络（Feed-Forward Network, FFN）。FFN 由两个线性层和 GELU 激活函数组成，用于对聚合后的特征进行进一步的语义提炼。整个注入过程采用残差连接（Residual Connection）方式：
+\begin{equation}
+    X'_{vis} = \text{LN}(X_{vis} + \text{MHCA}(X_{vis}, C_{sem}))
+\end{equation}
+\begin{equation}
+    X_{out} = \text{LN}(X'_{vis} + \text{FFN}(X'_{vis}))
+\end{equation}
+最后，利用重排操作（Rearrange）将输出序列 $X_{out}$ 还原为二维特征图 $\mathbb{R}^{H \times W \times C}$，继续参与 U-Net 的后续卷积运算。
+
+\textbf{基于语义引导的异常修正机制。} 
+上述机制在异常检测任务中扮演了“纠错器”的角色。当输入图像包含肿瘤（即异常的高信号区域）时，其生成的视觉查询向量 $Q_{anomaly}$ 与描述健康脑组织的文本键向量 $K_{healthy}$ 存在显著的语义冲突（例如，肿瘤的“高亮不规则”特征无法匹配文本中的“均匀低信号”描述）。在这种情况下，交叉注意力机制会强制模型关注最接近的健康语义描述（如“正常脑实质”），并利用对应的 Value 向量重构该区域。这种强制性的语义对齐导致重构出的图像在该区域表现为健康的组织纹理，从而与原始输入产生巨大的像素差异（残差），不仅实现了对肿瘤的抑制，更为后续的异常热力图生成提供了高对比度的差分信号。
+
+% 1
+
+
+
+\subsection{基于 CFG Drop 的鲁棒推理与异常评分策略}
+\label{subsec:cfg_drop}
+
+训练阶段使用的是针对单张图像生成的稠密描述（Dense Caption），其中包含了该图像特有的解剖细节；而在推理阶段，如果继续使用对测试图像（可能包含肿瘤）生成的详细描述，文本信息可能会意外泄露病灶的存在（例如描述中出现“高信号区域”），导致模型“忠实”地重构出肿瘤，从而使异常检测失效。为了解决这一训练与推理之间的信息不对称问题，并增强模型对“健康”语义的强制约束力，本研究提出了结合条件丢弃（Condition Drop）训练与无分类器引导（Classifier-Free Guidance, CFG）推理的鲁棒策略。
+
+\textbf{基于贝努力掩码的随机条件丢弃训练。} 
+为了防止扩散模型在训练过程中过度拟合文本条件 $C_{sem}$，从而退化为简单的文本到图像的映射工具，我们在训练循环中引入了随机条件掩码机制。假设训练样本的文本嵌入为 $C_{sem}$，我们定义一个服从贝努力分布的随机变量 $b \sim \text{Bernoulli}(1 - p_{drop})$，其中 $p_{drop}$ 为丢弃概率（本研究设定为 0.1）。在每一次训练迭代中，实际输入网络的条件 $C_{train}$ 根据下式确定：
+\begin{equation}
+    C_{train} = b \cdot C_{sem} + (1 - b) \cdot \emptyset
+\end{equation}
+其中，$\emptyset \in \mathbb{R}^{M \times D}$ 是一个可学习的空嵌入向量（Null Embedding），代表语义信息的完全缺失。这种训练策略迫使 U-Net 去噪网络同时学习两个互补的任务：一是在给定详细医学文本时的“条件生成分布” $p(x|C_{sem})$，二是在没有任何语义提示时的“无条件生成分布” $p(x|\emptyset)$。这种双重优化机制使得模型在潜在空间中建立的健康流形更加稳健，能够自适应地处理不同强度的语义引导。
+
+\textbf{基于通用提示词的 CFG 推理机制。} 
+在测试阶段，为了规避潜在的病灶信息泄露，我们不再使用图像特定的稠密描述，而是采用一个全局通用的类别级提示词（Class-level Prompt）：\textit{"A T2-FLAIR MRI scan of a healthy brain"}。该提示词充当了“健康锚点”，旨在激活模型中关于正常脑部解剖的全局先验。
+为了放大这一健康先验的约束力，我们采用无分类器引导（CFG）采样策略。在逆向扩散的每一步 $t$，模型预测的最终噪声 $\tilde{\epsilon}_\theta$ 由无条件预测项和有条件预测项线性组合而成：
+\begin{equation}
+    \tilde{\epsilon}_\theta(z_t, c_{generic}) = \epsilon_\theta(z_t, t, \emptyset) + s \cdot \left[ \epsilon_\theta(z_t, t, c_{generic}) - \epsilon_\theta(z_t, t, \emptyset) \right]
+\end{equation}
+在此公式中，$s$ 被称为引导尺度（Guidance Scale）。当 $s > 1$ 时，模型生成的方向将被强制推向文本 $c_{generic}$ 所描述的“健康语义中心”，并远离无条件的平均分布。在物理意义上，这意味着即使输入图像 $z_t$ 中隐含了肿瘤的特征，强大的引导尺度 $s$ 也会迫使去噪过程忽略这些异常信号，转而利用通用提示词中的“健康”概念来填补和修复该区域。这种机制显著增强了模型对异常区域的“纠错”能力。
+
+\subsection{本章小结}
+
+本章针对传统无监督异常检测方法中存在的“语义盲目性”与“结构漂移”问题，深入探讨了如何利用视觉-语言模型（VLM）为潜在扩散模型引入细粒度的医学语义引导。
+
+首先，本章提出了一种基于 Qwen3-30B 的医学专家提示工程策略。通过设计包含角色设定、先验植入与关注点引导的系统级指令，成功地将难以量化的脑部 MRI 图像特征转化为显式的、包含丰富解剖学细节的自然语言描述，从而构建了高质量的健康语义先验库。这一步骤有效地打破了纯视觉模型在理解复杂医学解剖结构时的认知局限。
+
+其次，针对多模态特征融合的难点，本章构建了基于多头交叉注意力（MHCA）的语义条件注入机制。该机制通过在 U-Net 的潜在空间内建立视觉查询与文本键值之间的动态映射，实现了从抽象语义到具体像素重构的精准控制。这种设计不仅解决了跨模态数据的维度对齐问题，更赋予了模型利用语义信息修正视觉缺陷的能力。
+
+最后，为了解决训练与推理阶段的条件不一致性，并强化模型对“健康”分布的依从性，本章设计了结合随机条件丢弃（Condition Drop）与无分类器引导（CFG）的鲁棒推理策略。通过在推理阶段引入通用的类别级提示词并放大引导尺度，强制模型忽略输入图像中的病灶信号，将其“修复”为符合解剖学规律的健康组织。
+
+
+
+% ---------------------------------------------------------------------------------------------
+% 第四章 多条件引导下的潜在扩散重构模型构建
+% ---------------------------------------------------------------------------------------------
+\section{多条件引导下的潜在扩散重构模型构建}
+
+在前两章中，我们分别构建了基于领域掩码网络的空间特征提取模块，以及基于视觉-语言模型（VLM）的医学语义条件生成模块。这两个模块分别从几何拓扑结构和高层解剖语义两个维度，为“健康的脑部应该是什么样”提供了强有力的先验知识。本章的核心任务是将这两种不同模态、不同维度的条件特征进行有效融合，并嵌入到去噪扩散概率模型的生成过程中。为了解决高分辨率医学图像带来的巨大计算开销，本研究采用潜在扩散模型（Latent Diffusion Models, LDM）架构，在低维潜在空间中完成受控的“加噪-去噪”过程，并最终基于重构残差实现对脑肿瘤的像素级定位。
+
+\subsection{基于 VAE 的潜在空间映射与感知压缩}
+\label{subsec:vae_compression}
+
+传统的扩散模型（如 DDPM）直接在像素空间（Pixel Space）进行操作。对于临床中常见的高分辨率脑部 MRI 切片（例如 $256 \times 256$ 或更大），在包含数万甚至数十万像素的空间中逐时间步地预测噪声，不仅极大地消耗了显存与算力，而且导致推理速度极慢，无法满足临床实际应用的需求。为了打破这一计算瓶颈，本研究引入了感知压缩（Perceptual Compression）技术，利用预训练的变分自编码器（Variational AutoEncoder, VAE）将高维像素数据映射到一个低维的、语义密集的潜在空间（Latent Space）中进行扩散操作。
+
+如图 \ref{fig:vae_compression} 所示，感知压缩机制由一个编码器 $\mathcal{E}$ 和一个解码器 $\mathcal{D}$ 组成。对于输入的原始 T2-FLAIR 切片 $x \in \mathbb{R}^{H \times W \times 1}$，编码器 $\mathcal{E}$ 首先将其向下采样，提取出高度抽象的潜在表示 $z = \mathcal{E}(x)$，其维度为 $z \in \mathbb{R}^{h \times w \times c}$。在本课题的实验设置中，下采样因子设为 $f = H/h = W/w = 8$，通道数 $c$ 设为 4。这意味着，原始的 $256 \times 256$ 图像被压缩为了 $32 \times 32 \times 4$ 的低维张量。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5cm]{0.8\textwidth}{\centering 待补充图片：基于 VAE 的图像到潜在空间压缩与解压缩流程图（展示 $256 \times 256$ 到 $32 \times 32$ 的尺寸变化）}}
+    \caption{感知压缩机制示意图。通过预训练的 VAE 编码器将高维脑部图像映射至低维潜在空间，大幅降低了扩散模型的计算复杂度，同时保留了核心解剖语义。}
+    \label{fig:vae_compression}
+\end{figure}
+
+这一压缩过程不仅是降低维度的数学变换，更具有重要的病理学意义。医学图像中常常包含大量的高频噪声和微小的不规则纹理，而肿瘤本身往往也表现为局部的高频信号异常。通过 VAE 的下采样压缩，模型能够自然地滤除部分极高频的细节，使得潜在变量 $z$ 更加聚焦于脑部的大尺度语义结构（如灰白质分布、脑室形态）。
+在获取潜在变量 $z_0$ 后，扩散模型的正向加噪过程（Forward Process）即在此空间内展开。根据马尔可夫链的性质，在时间步 $t$，向潜在特征 $z_{t-1}$ 中加入方差为 $\beta_t$ 的高斯噪声，其转移概率可表示为：
+$$q(z_t | z_{t-1}) = \mathcal{N}(z_t; \sqrt{1 - \beta_t} z_{t-1}, \beta_t I)$$
+经过 $T$ 个时间步的累积，最终的 $z_T$ 将退化为纯各向同性的高斯噪声。而我们要训练的核心，就是去噪网络（通常是一个 2D U-Net），它需要在这个低维空间中，根据我们提供的空间与语义条件，预测并剥离这些噪声。
+
+\subsection{融合双重条件的 U-Net 去噪网络架构}
+\label{subsec:dual_condition_unet}
+
+潜在空间中的去噪过程是整个重构算法的核心，其目标是训练一个条件去噪网络 $\epsilon_\theta(z_t, t, \mathcal{C})$，其中条件集合 $\mathcal{C} = \{F_{spatial}, C_{sem}\}$ 包含了来自第二章的空间结构特征 $F_{spatial}$ 与来自第三章的文本语义特征 $C_{sem}$。为了使这两种模态异构的特征能够协同引导去噪过程，本节设计了一种融合双重条件的 U-Net 架构。
+
+该 U-Net 的主干（Backbone）采用了标准的下采样-上采样对称结构，并配备了跳跃连接（Skip Connections）。为了注入条件特征，我们对网络结构进行了以下针对性改造：
+
+\textbf{1. 空间结构特征的零卷积残差注入}
+空间特征图 $F_{spatial}$ 具有与原始图像相同的拓扑布局，且其内部已经通过掩码机制滤除了局部的异常纹理，仅保留了全局解剖先验。为了将其作为结构约束引入模型，我们采用了类似 ControlNet 的零卷积（Zero-Convolution）策略。
+具体而言，对于 U-Net 中的每一个编码器块（Encoder Block），我们将该层的中间特征与经过下采样的 $F_{spatial}$ 进行通道维度上的拼接或相加。为了避免在训练初期，未经过充分训练的条件分支对原本稳定的去噪主干造成灾难性干扰，特征在注入前会经过一个权重和偏置均初始化为 0 的 $1 \times 1$ 卷积层（即 $\mathcal{Z}_{conv}$）：
+$$h_{out} = \text{Block}(h_{in}) + \mathcal{Z}_{conv}(F_{spatial}^{downsampled})$$
+随着训练的进行，零卷积的权重逐渐非零化，模型开始学会如何利用 $F_{spatial}$ 提供的几何轮廓信息来约束脑实质、颅骨和脑室的生成位置，从而在物理形态上防止了结构漂移。
+
+\textbf{2. 语义文本特征的交叉注意力引导}
+与空间特征不同，由 VLM 生成的文本描述特征 $C_{sem}$ 是离散的序列向量，缺乏空间拓扑信息。为了将其融入二维的生成过程中，我们在 U-Net 的各个分辨率层级中嵌入了交叉注意力机制（Cross-Attention Mechanism）（如 3.2 节所述）。
+U-Net 的中间层特征展平后作为查询（Query），而 $C_{sem}$ 作为键（Key）和值（Value）。这一机制在语义层面上发挥着“纠偏”作用：当模型在某个局部区域试图重构出类似肿瘤的高亮特征时，注意力机制会强制该区域的特征去匹配文本描述中关于“健康、均匀、低信号”的键值对，从而将其压制并转换为正常组织的纹理。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][6cm]{0.85\textwidth}{\centering 待补充图片：融合双重条件的 U-Net 去噪网络架构图。展示 $F_{spatial}$ 的残差注入路径以及 $C_{sem}$ 的交叉注意力交互位置。}}
+    \caption{多条件引导的 U-Net 去噪网络。空间特征提供刚性的几何布局约束，而文本语义提供柔性的组织纹理约束，两者共同指导潜在空间的噪声预测。}
+    \label{fig:dual_condition_unet}
+\end{figure}
+
+综上所述，去噪网络的训练目标是最小化预测噪声与真实添加噪声 $\epsilon$ 之间的均方误差，其损失函数 $\mathcal{L}_{LDM}$ 定义为：
+$$\mathcal{L}_{LDM} = \mathbb{E}_{\mathcal{E}(x), \epsilon \sim \mathcal{N}(0, 1), t} \left[ \left\| \epsilon - \epsilon_\theta(z_t, t, C_{sem}, F_{spatial}) \right\|_2^2 \right]$$
+通过在仅包含健康脑部的数据集上最小化该损失，网络最终掌握了在双重条件约束下生成健康脑部解剖结构的流形分布。
+
+\subsection{基于残差的异常评分与精确定位机制}
+\label{subsec:anomaly_scoring}
+
+在完成模型的训练后，我们即可利用该模型对包含肿瘤的未知测试图像进行无监督的异常检测与定位。检测的核心逻辑是：将测试图像送入受限的生成过程中，强制其被“修复”为健康图像，随后计算两者之间的差异。
+
+具体的推理与评分流程如下：
+首先，对于一张待测的异常脑部切片 $x_{test}$，利用 VAE 编码器将其映射到潜在空间获得 $z_{test}$。随后，为了在保留宏观结构和消除异常病灶之间取得平衡，我们不在潜在空间中添加完整的 $T$ 步噪声，而是执行部分加噪（Partial Forward Noising）。设定一个超参数截断时间步 $\tau < T$（例如 $\tau = 500$，总步长 $T=1000$），获取带噪潜在状态 $z_\tau$。这一步能够破坏掉肿瘤的高频纹理细节，使其“融入”背景噪声中。
+
+接着，启动双重条件引导的逆向去噪过程。将从 $x_{test}$ 中提取的空间特征 $F_{spatial}$ 和由通用提示词生成的语义特征 $C_{sem}$ 注入网络。经过 $\tau$ 步的迭代去噪，模型将预测出一条完全符合健康解剖先验的轨迹，并最终生成修复后的潜在状态 $\hat{z}_0$。
+
+最后，通过 VAE 的解码器将潜在状态还原至像素空间，得到重构后的健康图像 $\hat{x}_{test} = \mathcal{D}(\hat{z}_0)$。为了准确定位肿瘤区域，我们计算原始测试图像与重构图像之间的绝对残差图（Residual Map） $\mathcal{R}$：
+$$\mathcal{R}(i, j) = \left| x_{test}(i, j) - \hat{x}_{test}(i, j) \right|$$
+为了消除图像配准误差或正常组织轻微形态变化带来的背景噪声，对残差图 $\mathcal{R}$ 应用中值滤波进行平滑处理，并结合自适应阈值分割技术（Otsu's Method）生成最终的异常热力图（Heatmap）和二值化掩膜（Binary Mask）。
+
+\begin{figure}[htbp]
+    \centering
+    \fbox{\parbox[c][5.5cm]{0.8\textwidth}{\centering 待补充图片：异常定位流程与效果展示。依次并列展示：(a) 包含肿瘤的原始图像；(b) 重构出的健康图像（肿瘤被抹除）；(c) 生成的异常残差热力图；(d) 最终的肿瘤定位掩膜。}}
+    \caption{基于多条件引导的无监督异常定位结果示例。原始图像中的病灶区域在重构过程中被强制修复为健康组织，产生的显著残差精准地指示了肿瘤的位置与轮廓。}
+    \label{fig:anomaly_localization_result}
+\end{figure}
+
+在这种基于重构的范式下，只要输入图像某区域偏离了健康数据的分布特征，去噪网络就无法将其还原，从而在残差图中产生高亮响应。这一机制赋予了算法对任意未知病理形态极强的泛化能力。
+
+
+
+% ------------------------------
+\bibliography{paper}
+
+\end{document}
